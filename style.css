@@ -29,3 +29,7 @@ select{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--li
 .bars div{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:.9rem}
 .bars i{display:block;height:10px;background:var(--green);border-radius:5px}
 .track{flex:1;background:var(--line);border-radius:5px}
+input,textarea{font:inherit;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);width:100%}
+.item{display:grid;grid-template-columns:70px 1fr 1fr 28px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.item .hz{font-size:1.4rem}.item button{border:0;background:none;color:var(--muted);cursor:pointer}
+#list{margin-top:16px}

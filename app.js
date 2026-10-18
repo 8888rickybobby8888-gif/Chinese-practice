@@ -9,20 +9,23 @@ const st = w => save[w[0]] || (save[w[0]] = { box: 0, due: 0 });
 const $ = s => document.querySelector(s);
 const view = $("#view");
 const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const CKEY = "chinese-practice-custom-v1";
+const CUSTOM = "My Words";
+let custom = [];
+try { custom = JSON.parse(localStorage.getItem(CKEY)) || []; } catch (e) {}
+const saveCustom = () => { try { localStorage.setItem(CKEY, JSON.stringify(custom)); } catch (e) {} };
+const BASE = WORDS.slice();
+function rebuild() {
+  WORDS.length = 0;
+  WORDS.push(...BASE, ...custom.map(w => [w[0], w[1], w[2], CUSTOM]));
+  const cats = [...new Set(WORDS.map(w => w[3]))];
+  if (!cats.includes(cat)) cat = "All";
+  $("#cat").innerHTML = ["All", ...cats].map(c => `<option${c === cat ? " selected" : ""}>${c}</option>`).join("");
+}
 let mode = "cards", cat = "All";
 
 function pool() { return WORDS.filter(w => cat === "All" || w[3] === cat); }
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
-
-function speak(text) {
-  if (!("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/…/g, ""));
-  u.lang = "zh-CN"; u.rate = 0.8;
-  const v = speechSynthesis.getVoices().find(v => v.lang.replace("_", "-").startsWith("zh"));
-  if (v) u.voice = v;
-  speechSynthesis.speak(u);
-}
 
 // ---------- Flashcards ----------
 function nextCard() {
@@ -36,9 +39,7 @@ function nextCard() {
   }
   const w = due[Math.random() * due.length | 0];
   view.innerHTML = `<div class="card flip" id="c"><div class="hanzi">${esc(w[0])}</div><div class="hint">tap to reveal</div></div>
-    <div class="row"><button class="btn" id="say">🔊 Listen</button></div>`;
-  $("#say").onclick = () => speak(w[0]);
-  speak(w[0]);
+    `;
   $("#c").onclick = () => {
     $("#c").onclick = null;
     $("#c").innerHTML = `<div class="hanzi">${esc(w[0])}</div><div class="pinyin">${esc(w[1])}</div><div class="eng">${esc(w[2])}</div>`;
@@ -74,29 +75,41 @@ function nextQuiz() {
     persist();
     view.querySelectorAll(".opts button").forEach((x, i) => { x.disabled = true; if (opts[i] === w) x.classList.add("right"); });
     if (!ok) b.classList.add("wrong");
-    speak(w[0]);
     $("#info").textContent = `Score ${score}/${asked}`;
     view.insertAdjacentHTML("beforeend", `<div class="row"><div class="pinyin">${esc(w[0])} · ${esc(w[1])} · ${esc(w[2])}</div></div><div class="row"><button class="btn primary" id="n">Next</button></div>`);
     $("#n").onclick = nextQuiz;
   });
 }
 
-// ---------- Listening ----------
-function nextListen() {
-  const p = pool();
-  if (p.length < 4) { view.innerHTML = `<div class="card"><div class="eng">Pick a bigger topic (need 4+ words).</div></div>`; return; }
-  const w = p[Math.random() * p.length | 0];
-  const opts = shuffle([w, ...shuffle(p.filter(x => x !== w)).slice(0, 3)]);
-  view.innerHTML = `<div class="card"><div class="hanzi">🔊</div><div class="hint">Listen, then choose the meaning</div><button class="btn" id="rep">Play again</button></div>
-    <div class="opts">${opts.map((o, i) => `<button data-i="${i}">${esc(o[2])}</button>`).join("")}</div>`;
-  $("#rep").onclick = () => speak(w[0]);
-  setTimeout(() => speak(w[0]), 200);
-  view.querySelectorAll(".opts button").forEach(b => b.onclick = () => {
-    const ok = opts[+b.dataset.i] === w;
-    view.querySelectorAll(".opts button").forEach((x, i) => { x.disabled = true; if (opts[i] === w) x.classList.add("right"); });
-    if (!ok) b.classList.add("wrong");
-    view.insertAdjacentHTML("beforeend", `<div class="row"><div class="pinyin">${esc(w[0])} · ${esc(w[1])}</div></div><div class="row"><button class="btn primary" id="n">Next</button></div>`);
-    $("#n").onclick = nextListen;
+// ---------- My words ----------
+function myWords() {
+  $("#info").textContent = `${custom.length} of your own`;
+  view.innerHTML = `<form id="f" class="opts">
+      <input id="h" placeholder="Chinese (e.g. 猫)" required>
+      <input id="p" placeholder="Pinyin (e.g. māo)">
+      <input id="e" placeholder="English (e.g. cat)" required>
+      <button class="btn primary" style="text-align:center">Add word</button>
+    </form>
+    <details style="margin-top:14px"><summary class="hint">Add many at once</summary>
+      <textarea id="bulk" rows="5" placeholder="One per line: 猫, māo, cat"></textarea>
+      <div class="row"><button class="btn" id="addbulk">Add all</button></div>
+    </details>
+    <div id="list">${custom.map((w, i) => `<div class="item"><span class="hz">${esc(w[0])}</span><span>${esc(w[1])}</span><span>${esc(w[2])}</span><button data-d="${i}" title="Delete">✕</button></div>`).join("") || `<p class="hint">No words yet. Add your first one above.</p>`}</div>`;
+  $("#f").onsubmit = e => {
+    e.preventDefault();
+    custom.push([$("#h").value.trim(), $("#p").value.trim(), $("#e").value.trim()]);
+    saveCustom(); rebuild(); myWords(); $("#h").focus();
+  };
+  $("#addbulk").onclick = () => {
+    $("#bulk").value.split("\n").forEach(l => {
+      const p = l.split(/[,，\t]/).map(x => x.trim());
+      if (p.length >= 3 && p[0] && p[2]) custom.push([p[0], p[1], p.slice(2).join(", ")]);
+    });
+    saveCustom(); rebuild(); myWords();
+  };
+  view.querySelectorAll("[data-d]").forEach(b => b.onclick = () => {
+    const w = custom.splice(+b.dataset.d, 1)[0];
+    delete save[w[0]]; persist(); saveCustom(); rebuild(); myWords();
   });
 }
 
@@ -118,11 +131,10 @@ function progress() {
 }
 
 function render() {
-  speechSynthesis && speechSynthesis.cancel();
-  ({ cards: nextCard, quiz: nextQuiz, listen: nextListen, progress })[mode]();
+  ({ cards: nextCard, quiz: nextQuiz, words: myWords, progress })[mode]();
 }
 
-$("#cat").innerHTML = ["All", ...new Set(WORDS.map(w => w[3]))].map(c => `<option>${c}</option>`).join("");
+rebuild();
 $("#cat").onchange = e => { cat = e.target.value; render(); };
 $("#nav").onclick = e => {
   const b = e.target.closest("button"); if (!b) return;
