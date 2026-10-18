@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学中文 – Chinese Practice</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1><span>学</span>中文 Chinese Practice</h1></header>
+<nav id="nav">
+  <button data-m="cards" class="on">Flashcards</button>
+  <button data-m="quiz">Quiz</button>
+  <button data-m="listen">Listening</button>
+  <button data-m="progress">Progress</button>
+</nav>
+<main>
+  <div class="bar">
+    <label>Topic <select id="cat"></select></label>
+    <span id="info"></span>
+  </div>
+  <div id="view"></div>
+</main>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
