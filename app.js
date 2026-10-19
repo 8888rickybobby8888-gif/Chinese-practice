@@ -15,7 +15,7 @@ let custom = [];
 try { custom = JSON.parse(localStorage.getItem(CKEY)) || []; } catch (e) {}
 const saveCustom = () => { try { localStorage.setItem(CKEY, JSON.stringify(custom)); } catch (e) {} };
 const BASE = WORDS.slice();
-const LKEY = "chinese-practice-lesson-v1";
+const LKEY = "chinese-practice-unit-v1";
 let upTo = PRESCRIBED_LESSONS.length - 1;
 try { const n = parseInt(localStorage.getItem(LKEY)); if (n >= 0 && n < PRESCRIBED_LESSONS.length) upTo = n; } catch (e) {}
 function rebuild() {

@@ -1,11 +1,13 @@
 // Prescribed words from the Year 7 Chinese study booklet (Amazing Chinese 1).
 // Format per line: hanzi | pinyin | english. Earlier lessons win if a word repeats.
-// The booklet's reading/writing lists only group words by unit (Lessons 1-3, 4-6,
-// 7-9, 10-12), so extra words from those lists sit in the last lesson of the unit.
+// Words are grouped by unit, matching the booklet's reading/writing lists.
 const PRESCRIBED_LESSONS = [
-  "Lessons 1–3", "Lessons 4–6", "Lesson 7", "Lesson 8", "Lesson 9",
-  "Lesson 10", "Lesson 11", "Lesson 12",
+  "Unit 1: Myself and My Family (Lessons 1–3)",
+  "Unit 2: Personal Background (Lessons 4–6)",
+  "Unit 3: Daily Routine and Hobbies (Lessons 7–9)",
+  "Unit 4: Food and Drink (Lessons 10–12)",
 ];
+const UNIT_OF_LESSON = [0, 1, 2, 2, 2, 3, 3, 3];
 const PRESCRIBED_RAW = [
 `我|wǒ|I, me
 你好|nǐ hǎo|hello
@@ -340,7 +342,7 @@ const PRESCRIBED = (() => {
     const [h, p, e] = line.split("|").map(s => s.trim());
     if (!h || seen.has(h)) return;
     seen.add(h);
-    out.push([h, p, e, "Prescribed words", li]);
+    out.push([h, p, e, "Prescribed words", UNIT_OF_LESSON[li]]);
   }));
   return out;
 })();
