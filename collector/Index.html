@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+:root{--bg:#faf7f2;--card:#fff;--ink:#2a2420;--muted:#7a6f66;--red:#c8372d;--green:#2e8b57;--line:#e6ddd2}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1816;--card:#26221f;--ink:#f1e9df;--muted:#a39688;--line:#3a342f}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem}h1 span{color:var(--red)}h2{font-size:1.05rem;margin:22px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.stat{text-align:center;border:1px solid var(--line);border-radius:10px;padding:8px}.stat b{display:block;font-size:1.4rem}
+.days{display:flex;align-items:flex-end;gap:3px;height:60px}
+.days div{flex:1;background:var(--green);border-radius:2px 2px 0 0;min-height:2px}.days .z{background:var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td{padding:4px;border-bottom:1px solid var(--line)}
+.hint{color:var(--muted);font-size:.85rem}.ok{color:var(--green)}.no{color:var(--red)}
+button{font:inherit;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><h1><span>学</span>中文 Dashboard</h1><button onclick="load()">Refresh</button></div>
+  <div id="out" class="hint">Loading…</div>
+</main>
+<script>
+const KEY = <?!= JSON.stringify(key) ?>;
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function days14(perDay) {
+  const out = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 864e5);
+    const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    out.push([k, perDay[k] || 0]);
+  }
+  return out;
+}
+function render(users) {
+  if (!users.length) { document.getElementById("out").textContent = "No data yet. Practise on the site and answers will appear here."; return; }
+  document.getElementById("out").innerHTML = users.map(u => {
+    const d = days14(u.perDay), max = Math.max(1, ...d.map(x => x[1]));
+    return `<div class="card"><div class="top"><b>${esc(u.user)}</b><span class="hint">last active ${esc(u.last.replace("T", " ").slice(0, 16))}</span></div>
+      <div class="stats"><div class="stat"><b>${u.answered}</b>answers</div><div class="stat"><b>${u.answered ? Math.round(u.correct / u.answered * 100) + "%" : "–"}</b>accuracy</div><div class="stat"><b>${d.filter(x => x[1]).length}</b>active days (14d)</div></div>
+      <div class="days">${d.map(x => `<div class="${x[1] ? "" : "z"}" style="height:${x[1] / max * 100}%" title="${x[0]}: ${x[1]}"></div>`).join("")}</div>
+      <h2>Trickiest words</h2>${u.missed.length ? `<table>${u.missed.map(m => `<tr><td style="font-size:1.2rem">${esc(m.word[0])}</td><td>${esc(m.word[1])}</td><td>${esc(m.word[2])}</td><td class="no">${m.n}× missed</td></tr>`).join("")}</table>` : `<p class="hint">Nothing missed.</p>`}
+      <h2>Recent</h2><table>${u.recent.map(r => `<tr><td class="${r.ok ? "ok" : "no"}">${r.ok ? "✓" : "✗"}</td><td style="font-size:1.1rem">${esc(r.hanzi)}</td><td>${esc(r.english)}</td><td class="hint">${esc(r.time.replace("T", " ").slice(0, 16))}</td></tr>`).join("")}</table></div>`;
+  }).join("");
+}
+function load() {
+  document.getElementById("out").textContent = "Loading…";
+  google.script.run.withSuccessHandler(render).withFailureHandler(e => document.getElementById("out").textContent = "Error: " + e.message).getStats(KEY);
+}
+load();
+</script>
+</body>
+</html>
