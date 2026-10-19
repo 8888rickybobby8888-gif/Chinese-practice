@@ -15,14 +15,17 @@ let custom = [];
 try { custom = JSON.parse(localStorage.getItem(CKEY)) || []; } catch (e) {}
 const saveCustom = () => { try { localStorage.setItem(CKEY, JSON.stringify(custom)); } catch (e) {} };
 const BASE = WORDS.slice();
+const LKEY = "chinese-practice-lesson-v1";
+let upTo = PRESCRIBED_LESSONS.length - 1;
+try { const n = parseInt(localStorage.getItem(LKEY)); if (n >= 0 && n < PRESCRIBED_LESSONS.length) upTo = n; } catch (e) {}
 function rebuild() {
   WORDS.length = 0;
-  WORDS.push(...BASE, ...custom.map(w => [w[0], w[1], w[2], CUSTOM]));
+  WORDS.push(...PRESCRIBED.filter(w => w[4] <= upTo), ...BASE, ...custom.map(w => [w[0], w[1], w[2], CUSTOM]));
   const cats = [...new Set(WORDS.map(w => w[3]))];
-  if (!cats.includes(cat)) cat = "All";
+  if (!cats.includes(cat)) cat = "Prescribed words";
   $("#cat").innerHTML = ["All", ...cats].map(c => `<option${c === cat ? " selected" : ""}>${c}</option>`).join("");
 }
-let mode = "cards", cat = "All";
+let mode = "cards", cat = "Prescribed words";
 
 function pool() { return WORDS.filter(w => cat === "All" || w[3] === cat); }
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -135,6 +138,12 @@ function render() {
 }
 
 rebuild();
+$("#lesson").innerHTML = PRESCRIBED_LESSONS.map((l, i) => `<option value="${i}"${i === upTo ? " selected" : ""}>${l}</option>`).join("");
+$("#lesson").onchange = e => {
+  upTo = +e.target.value;
+  try { localStorage.setItem(LKEY, upTo); } catch (err) {}
+  rebuild(); render();
+};
 $("#cat").onchange = e => { cat = e.target.value; render(); };
 $("#nav").onclick = e => {
   const b = e.target.closest("button"); if (!b) return;
