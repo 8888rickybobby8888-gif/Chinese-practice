@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log in – Chinese Practice</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1><span>学</span>中文 Chinese Practice</h1></header>
+<main>
+  <form id="f" class="opts" autocomplete="off">
+    <h2 style="margin:0">Log in</h2>
+    <input id="name" placeholder="Your name" maxlength="30" required autofocus>
+    <button class="btn primary" style="text-align:center">Continue</button>
+  </form>
+  <div id="existing"></div>
+  <p class="hint">Profiles are kept in this browser only. There is no password, so don't use this to protect anything private.</p>
+</main>
+<script src="common.js"></script>
+<script>
+const go = n => { if (CP.login(n)) location.href = "index.html"; };
+document.getElementById("f").onsubmit = e => { e.preventDefault(); go(document.getElementById("name").value); };
+const box = document.getElementById("existing");
+if (CP.users().length) {
+  box.innerHTML = `<p class="hint">Or continue as:</p><div class="opts"></div>`;
+  CP.users().forEach(u => {
+    const b = document.createElement("button");
+    b.textContent = u; b.onclick = () => go(u);
+    box.lastChild.appendChild(b);
+  });
+}
+</script>
+</body>
+</html>

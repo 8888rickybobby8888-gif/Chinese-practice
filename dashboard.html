@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard – Chinese Practice</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.stats.four{grid-template-columns:repeat(2,1fr)}
+@media(min-width:480px){.stats.four{grid-template-columns:repeat(4,1fr)}}
+h2{font-size:1.05rem;margin:22px 0 8px}
+.days{display:flex;align-items:flex-end;gap:4px;height:90px}
+.days div{flex:1;background:var(--green);border-radius:3px 3px 0 0;min-height:2px}
+.days div.zero{background:var(--line)}
+.lbl{display:flex;justify-content:space-between;color:var(--muted);font-size:.75rem}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.ok{color:var(--green)}.no{color:var(--red)}
+</style>
+</head>
+<body>
+<header><h1><span>学</span>中文 Dashboard</h1><div class="hint"><span id="who"></span> · <a href="index.html">Back to practice</a></div></header>
+<main id="m"></main>
+<script src="common.js"></script>
+<script src="data.js"></script>
+<script src="prescribed.js"></script>
+<script>
+if (CP.require()) {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const day = t => { const d = new Date(t); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); };
+  $("#who").textContent = CP.user();
+
+  function summary(u) {
+    const progress = CP.read("progress", u) || {}, ev = CP.read("events", u) || [];
+    return { progress, ev, answered: ev.length, correct: ev.filter(e => e.ok).length };
+  }
+  const me = summary(CP.user());
+  const custom = CP.read("custom") || [];
+  const info = {}; // first listing of a word wins, as in the app
+  [...PRESCRIBED, ...WORDS, ...custom.map(w => [w[0], w[1], w[2], "My Words"])].forEach(w => { if (!info[w[0]]) info[w[0]] = w; });
+  const words = Object.values(info);
+  const learned = w => (me.progress[w[0]] || {}).box >= 3;
+  const started = w => (me.progress[w[0]] || {}).box >= 1;
+  const acc = me.answered ? Math.round(me.correct / me.answered * 100) + "%" : "–";
+
+  // activity per day (last 14) and streak
+  const per = {}; me.ev.forEach(e => per[day(e.t)] = (per[day(e.t)] || 0) + 1);
+  const days = [];
+  for (let i = 13; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5); days.push([day(d), per[day(d)] || 0, d]); }
+  let streak = 0;
+  for (let i = days.length - 1; i >= 0; i--) { if (days[i][1]) streak++; else if (i !== days.length - 1) break; }
+  const max = Math.max(1, ...days.map(d => d[1]));
+
+  // per-topic mastery
+  const cats = [...new Set(words.map(w => w[3]))];
+  const bars = cats.map(c => {
+    const ws = words.filter(w => w[3] === c), n = ws.filter(learned).length;
+    return `<div><span style="width:110px">${esc(c)}</span><span class="track"><i style="width:${n / ws.length * 100}%"></i></span><span>${n}/${ws.length}</span></div>`;
+  }).join("");
+
+  // trickiest words
+  const wrong = {}; me.ev.forEach(e => { if (!e.ok) wrong[e.w] = (wrong[e.w] || 0) + 1; });
+  const hard = Object.entries(wrong).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([h, n]) => { const w = info[h]; return `<tr><td style="font-size:1.3rem">${esc(h)}</td><td>${w ? esc(w[1]) : ""}</td><td>${w ? esc(w[2]) : ""}</td><td class="no">${n}× missed</td></tr>`; }).join("");
+
+  const recent = me.ev.slice(-10).reverse().map(e => {
+    const w = info[e.w];
+    return `<tr><td class="${e.ok ? "ok" : "no"}">${e.ok ? "✓" : "✗"}</td><td style="font-size:1.2rem">${esc(e.w)}</td><td>${w ? esc(w[2]) : ""}</td><td class="hint">${new Date(e.t).toLocaleString()}</td></tr>`;
+  }).join("");
+
+  const profiles = CP.users().map(u => {
+    const s = summary(u);
+    return `<tr><td>${esc(u)}${u === CP.user() ? " (you)" : ""}</td><td>${s.answered} answers</td><td>${s.answered ? Math.round(s.correct / s.answered * 100) + "%" : "–"}</td></tr>`;
+  }).join("");
+
+  $("#m").innerHTML = `
+    <div class="stats four">
+      <div class="stat"><b>${words.filter(learned).length}</b>learned</div>
+      <div class="stat"><b>${words.filter(started).length}</b>started</div>
+      <div class="stat"><b>${acc}</b>accuracy</div>
+      <div class="stat"><b>${streak}</b>day streak</div>
+    </div>
+    <h2>Answers, last 14 days</h2>
+    <div class="days">${days.map(d => `<div class="${d[1] ? "" : "zero"}" style="height:${d[1] / max * 100}%" title="${d[0]}: ${d[1]}"></div>`).join("")}</div>
+    <div class="lbl"><span>${days[0][2].toLocaleDateString()}</span><span>today</span></div>
+    <h2>Topics (learned = 3+ right in a row)</h2><div class="bars">${bars}</div>
+    <h2>Trickiest words</h2>${hard ? `<table>${hard}</table>` : `<p class="hint">Nothing missed yet.</p>`}
+    <h2>Recent answers</h2>${recent ? `<table>${recent}</table>` : `<p class="hint">No answers yet. Go practise!</p>`}
+    <h2>Profiles on this device</h2><table>${profiles}</table>
+    <p class="hint">Data comes from this browser. Set a webhook URL in Settings to also send each answer to your own service.</p>`;
+}
+</script>
+</body>
+</html>

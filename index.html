@@ -7,12 +7,13 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header><h1><span>学</span>中文 Chinese Practice</h1></header>
+<header><h1><span>学</span>中文 Chinese Practice</h1><div class="hint"><span id="who"></span> · <a href="dashboard.html">Dashboard</a></div></header>
 <nav id="nav">
   <button data-m="cards" class="on">Flashcards</button>
   <button data-m="quiz">Quiz</button>
   <button data-m="words">My Words</button>
   <button data-m="progress">Progress</button>
+  <button data-m="settings">Settings</button>
 </nav>
 <main>
   <div class="bar">
@@ -22,6 +23,7 @@
   </div>
   <div id="view"></div>
 </main>
+<script src="common.js"></script>
 <script src="data.js"></script>
 <script src="prescribed.js"></script>
 <script src="app.js"></script>

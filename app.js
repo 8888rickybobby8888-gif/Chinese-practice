@@ -1,23 +1,21 @@
 // Spaced repetition (Leitner boxes) stored in localStorage.
-const KEY = "chinese-practice-v1";
+if (!CP.require()) throw new Error("not logged in");
 const INTERVALS = [0, 1, 2, 4, 8, 16]; // days per box
 const DAY = 864e5;
-let save = {};
-try { save = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
-const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
+let save = CP.read("progress") || {};
+const persist = () => CP.write("progress", save);
+let cfg = CP.settings();
+const py = s => cfg.hidePinyin ? "" : s;
 const st = w => save[w[0]] || (save[w[0]] = { box: 0, due: 0 });
 const $ = s => document.querySelector(s);
 const view = $("#view");
 const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const CKEY = "chinese-practice-custom-v1";
 const CUSTOM = "My Words";
-let custom = [];
-try { custom = JSON.parse(localStorage.getItem(CKEY)) || []; } catch (e) {}
-const saveCustom = () => { try { localStorage.setItem(CKEY, JSON.stringify(custom)); } catch (e) {} };
+let custom = CP.read("custom") || [];
+const saveCustom = () => CP.write("custom", custom);
 const BASE = WORDS.slice();
-const LKEY = "chinese-practice-unit-v1";
 let upTo = PRESCRIBED_LESSONS.length - 1;
-try { const n = parseInt(localStorage.getItem(LKEY)); if (n >= 0 && n < PRESCRIBED_LESSONS.length) upTo = n; } catch (e) {}
+{ const n = CP.read("unit"); if (n >= 0 && n < PRESCRIBED_LESSONS.length) upTo = n; }
 function rebuild() {
   WORDS.length = 0;
   WORDS.push(...PRESCRIBED.filter(w => w[4] <= upTo), ...BASE, ...custom.map(w => [w[0], w[1], w[2], CUSTOM]));
@@ -45,7 +43,7 @@ function nextCard() {
     `;
   $("#c").onclick = () => {
     $("#c").onclick = null;
-    $("#c").innerHTML = `<div class="hanzi">${esc(w[0])}</div><div class="pinyin">${esc(w[1])}</div><div class="eng">${esc(w[2])}</div>`;
+    $("#c").innerHTML = `<div class="hanzi">${esc(w[0])}</div>${py(`<div class="pinyin">${esc(w[1])}</div>`)}<div class="eng">${esc(w[2])}</div>`;
     view.insertAdjacentHTML("beforeend", `<div class="row"><button class="btn bad" id="no">Again</button><button class="btn good" id="yes">Got it</button></div>`);
     $("#no").onclick = () => grade(w, false);
     $("#yes").onclick = () => grade(w, true);
@@ -55,7 +53,7 @@ function grade(w, ok) {
   const s = st(w);
   s.box = ok ? Math.min(s.box + 1, INTERVALS.length - 1) : 0;
   s.due = ok ? Date.now() + INTERVALS[s.box] * DAY : Date.now();
-  persist(); nextCard();
+  persist(); CP.track(w, ok, "flashcards"); nextCard();
 }
 
 // ---------- Quiz ----------
@@ -69,17 +67,17 @@ function nextQuiz() {
   const opts = shuffle([w, ...wrong]);
   $("#info").textContent = `Score ${score}/${asked}`;
   view.innerHTML = `<div class="card"><div class="${toEng ? "hanzi" : "eng"}">${esc(toEng ? w[0] : w[2])}</div>${toEng ? `<div class="hint">What does it mean?</div>` : `<div class="hint">Which is the Chinese?</div>`}</div>
-    <div class="opts">${opts.map((o, i) => `<button data-i="${i}">${toEng ? esc(o[2]) : esc(o[0]) + " &nbsp;<small>" + esc(o[1]) + "</small>"}</button>`).join("")}</div>`;
+    <div class="opts">${opts.map((o, i) => `<button data-i="${i}">${toEng ? esc(o[2]) : esc(o[0]) + (cfg.hidePinyin ? "" : " &nbsp;<small>" + esc(o[1]) + "</small>")}</button>`).join("")}</div>`;
   view.querySelectorAll(".opts button").forEach(b => b.onclick = () => {
     const o = opts[+b.dataset.i], ok = o === w;
     asked++; if (ok) score++;
     const s = st(w);
     s.box = ok ? Math.min(s.box + 1, INTERVALS.length - 1) : 0; s.due = ok ? Date.now() + INTERVALS[s.box] * DAY : Date.now();
-    persist();
+    persist(); CP.track(w, ok, "quiz");
     view.querySelectorAll(".opts button").forEach((x, i) => { x.disabled = true; if (opts[i] === w) x.classList.add("right"); });
     if (!ok) b.classList.add("wrong");
     $("#info").textContent = `Score ${score}/${asked}`;
-    view.insertAdjacentHTML("beforeend", `<div class="row"><div class="pinyin">${esc(w[0])} · ${esc(w[1])} · ${esc(w[2])}</div></div><div class="row"><button class="btn primary" id="n">Next</button></div>`);
+    view.insertAdjacentHTML("beforeend", `<div class="row"><div class="pinyin">${[w[0], py(w[1]), w[2]].filter(Boolean).map(esc).join(" · ")}</div></div><div class="row"><button class="btn primary" id="n">Next</button></div>`);
     $("#n").onclick = nextQuiz;
   });
 }
@@ -97,7 +95,7 @@ function myWords() {
       <textarea id="bulk" rows="5" placeholder="One per line: 猫, māo, cat"></textarea>
       <div class="row"><button class="btn" id="addbulk">Add all</button></div>
     </details>
-    <div id="list">${custom.map((w, i) => `<div class="item"><span class="hz">${esc(w[0])}</span><span>${esc(w[1])}</span><span>${esc(w[2])}</span><button data-d="${i}" title="Delete">✕</button></div>`).join("") || `<p class="hint">No words yet. Add your first one above.</p>`}</div>`;
+    <div id="list">${custom.map((w, i) => `<div class="item"><span class="hz">${esc(w[0])}</span><span>${esc(py(w[1]))}</span><span>${esc(w[2])}</span><button data-d="${i}" title="Delete">✕</button></div>`).join("") || `<p class="hint">No words yet. Add your first one above.</p>`}</div>`;
   $("#f").onsubmit = e => {
     e.preventDefault();
     custom.push([$("#h").value.trim(), $("#p").value.trim(), $("#e").value.trim()]);
@@ -114,6 +112,29 @@ function myWords() {
     const w = custom.splice(+b.dataset.d, 1)[0];
     delete save[w[0]]; persist(); saveCustom(); rebuild(); myWords();
   });
+}
+
+// ---------- Settings ----------
+function settings() {
+  $("#info").textContent = "";
+  view.innerHTML = `<div class="opts">
+      <label class="setting"><input type="checkbox" id="hp"${cfg.hidePinyin ? " checked" : ""}> <span>Hide pinyin<br><small class="hint">Show Chinese characters only, to test yourself.</small></span></label>
+      <label>Webhook URL <small class="hint">(optional)</small>
+        <input id="wh" type="url" placeholder="https://example.com/hook" value="${esc(cfg.webhook)}">
+      </label>
+      <p class="hint" style="margin:0">If set, each answer and login is sent to this URL as a JSON POST (user, word, correct/wrong, running totals). Your dashboard page shows the same data from this browser.</p>
+      <div class="row"><button type="button" class="btn" id="twh">Send test</button></div>
+      <button type="button" class="btn" id="out" style="text-align:center">Log out (${esc(CP.user())})</button>
+    </div>`;
+  const store = () => { CP.write("settings", cfg); };
+  $("#hp").onchange = e => { cfg.hidePinyin = e.target.checked; store(); };
+  $("#wh").onchange = e => { cfg.webhook = e.target.value.trim(); store(); };
+  $("#twh").onclick = () => {
+    cfg.webhook = $("#wh").value.trim(); store();
+    if (!/^https?:\/\//i.test(cfg.webhook)) { alert("Enter a webhook URL starting with http:// or https://"); return; }
+    CP.send("test", {}); alert("Test sent. (Browsers can't show the response from your server.)");
+  };
+  $("#out").onclick = CP.logout;
 }
 
 // ---------- Progress ----------
@@ -134,14 +155,14 @@ function progress() {
 }
 
 function render() {
-  ({ cards: nextCard, quiz: nextQuiz, words: myWords, progress })[mode]();
+  ({ cards: nextCard, quiz: nextQuiz, words: myWords, progress, settings })[mode]();
 }
 
 rebuild();
 $("#lesson").innerHTML = PRESCRIBED_LESSONS.map((l, i) => `<option value="${i}"${i === upTo ? " selected" : ""}>${l}</option>`).join("");
 $("#lesson").onchange = e => {
   upTo = +e.target.value;
-  try { localStorage.setItem(LKEY, upTo); } catch (err) {}
+  CP.write("unit", upTo);
   rebuild(); render();
 };
 $("#cat").onchange = e => { cat = e.target.value; render(); };
@@ -151,4 +172,5 @@ $("#nav").onclick = e => {
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
   render();
 };
+if (CP.user()) document.getElementById("who").textContent = CP.user();
 render();
