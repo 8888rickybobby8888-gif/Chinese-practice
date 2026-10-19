@@ -9,7 +9,7 @@ const CP = (() => {
   const key = (n, u = user()) => `cp:${u}:${n}`;
   const read = (n, u) => get(key(n, u));
   const write = (n, v) => set(key(n), v);
-  const DEFAULTS = { hidePinyin: false, webhook: "" };
+  const DEFAULTS = { hidePinyin: false, webhook: "", qTypes: { mc: true, meaning: true, pinyin: true, chars: false } };
   const settings = u => Object.assign({}, DEFAULTS, read("settings", u));
 
   function login(name) {

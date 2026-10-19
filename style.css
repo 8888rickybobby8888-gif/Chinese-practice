@@ -38,3 +38,4 @@ a{color:var(--red)}
 .setting input{width:auto;margin-top:4px}
 .opts label{display:grid;gap:4px}
 .opts label.setting{display:flex}
+.result{font-weight:600;font-size:1.2rem;text-align:center}.result.right{color:var(--green)}.result.wrong{color:var(--red)}

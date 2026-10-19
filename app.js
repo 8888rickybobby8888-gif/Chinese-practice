@@ -58,22 +58,64 @@ function grade(w, ok) {
 
 // ---------- Quiz ----------
 let score = 0, asked = 0;
+const QTYPES = { mc: "Multiple choice", meaning: "Type the meaning", pinyin: "Type the pinyin", chars: "Type the characters" };
+
+// Answer checking for typed questions.
+const cleanEn = s => s.toLowerCase().replace(/[’‘]/g, "'").replace(/\(.*?\)/g, " ").replace(/[^a-z0-9' ]/g, " ")
+  .replace(/\b(to|a|an|the)\b/g, " ").replace(/\s+/g, " ").trim();
+const meaningOk = (typed, w) => {
+  const t = cleanEn(typed);
+  return !!t && [w[2], ...w[2].split(/[\/;,]/)].some(a => cleanEn(a) === t);
+};
+const toneless = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/v/g, "u").replace(/[^a-z]/g, "");
+const pinyinOk = (typed, w) => { const t = toneless(typed); return !!t && t === toneless(w[1]); };
+const squash = s => s.replace(/[\s….,，。？！?!、~～]/g, "");
+const charsOk = (typed, w) => { const t = squash(typed); return !!t && t === squash(w[0]); };
+
 function nextQuiz() {
   const p = pool();
-  if (p.length < 4) { view.innerHTML = `<div class="card"><div class="eng">Pick a bigger topic (need 4+ words).</div></div>`; return; }
+  if (!p.length) { view.innerHTML = `<div class="card"><div class="eng">No words in this topic.</div></div>`; return; }
   const w = p[Math.random() * p.length | 0];
+  const on = Object.keys(QTYPES).filter(k => cfg.qTypes && cfg.qTypes[k] && (k !== "pinyin" || w[1]) && (k !== "mc" || p.length >= 4));
+  const type = on.length ? on[Math.random() * on.length | 0] : (p.length >= 4 ? "mc" : "meaning");
+  $("#info").textContent = `Score ${score}/${asked}`;
+  if (type === "mc") return quizChoice(p, w);
+
+  const prompt = type === "chars" ? w[2] : w[0];
+  const hint = { meaning: "Type the English meaning", pinyin: "Type the pinyin (tones optional)", chars: "Type it in Chinese characters" }[type];
+  const check = { meaning: meaningOk, pinyin: pinyinOk, chars: charsOk }[type];
+  view.innerHTML = `<div class="card"><div class="${type === "chars" ? "eng" : "hanzi"}">${esc(prompt)}</div>
+      ${type === "chars" && !cfg.hidePinyin && w[1] ? `<div class="pinyin">${esc(w[1])}</div>` : ""}<div class="hint">${hint}</div></div>
+    <form id="qf" class="opts" autocomplete="off"><input id="ans" autofocus autocapitalize="off" spellcheck="false" placeholder="Your answer"><button class="btn primary" style="text-align:center">Check</button></form>`;
+  $("#ans").focus();
+  $("#qf").onsubmit = e => {
+    e.preventDefault();
+    let ok = check($("#ans").value, w);
+    $("#ans").disabled = true;
+    const shown = [w[0], py(w[1]), w[2]].filter(Boolean).map(esc).join(" · ");
+    $("#qf").innerHTML = `<div class="${ok ? "right" : "wrong"} result">${ok ? "Correct!" : "Not quite"}</div>
+      <div class="row"><div class="pinyin">${shown}</div></div>
+      <div class="row">${ok ? "" : `<button type="button" class="btn" id="ov">I was right</button>`}<button class="btn primary" id="n">Next</button></div>`;
+    if (!ok) $("#ov").onclick = () => { ok = true; $("#ov").remove(); const r = view.querySelector(".result"); r.className = "right result"; r.textContent = "Marked correct"; };
+    $("#n").onclick = e2 => { e2.preventDefault(); finishQuiz(w, ok, "quiz-" + type); nextQuiz(); };
+    $("#n").focus();
+  };
+}
+function finishQuiz(w, ok, source) {
+  asked++; if (ok) score++;
+  const s = st(w);
+  s.box = ok ? Math.min(s.box + 1, INTERVALS.length - 1) : 0; s.due = ok ? Date.now() + INTERVALS[s.box] * DAY : Date.now();
+  persist(); CP.track(w, ok, source);
+}
+function quizChoice(p, w) {
   const toEng = Math.random() < 0.5;
   const wrong = shuffle(WORDS.filter(x => x !== w && (x[3] === w[3] || p.length < 8))).slice(0, 3);
   const opts = shuffle([w, ...wrong]);
-  $("#info").textContent = `Score ${score}/${asked}`;
   view.innerHTML = `<div class="card"><div class="${toEng ? "hanzi" : "eng"}">${esc(toEng ? w[0] : w[2])}</div>${toEng ? `<div class="hint">What does it mean?</div>` : `<div class="hint">Which is the Chinese?</div>`}</div>
     <div class="opts">${opts.map((o, i) => `<button data-i="${i}">${toEng ? esc(o[2]) : esc(o[0]) + (cfg.hidePinyin ? "" : " &nbsp;<small>" + esc(o[1]) + "</small>")}</button>`).join("")}</div>`;
   view.querySelectorAll(".opts button").forEach(b => b.onclick = () => {
-    const o = opts[+b.dataset.i], ok = o === w;
-    asked++; if (ok) score++;
-    const s = st(w);
-    s.box = ok ? Math.min(s.box + 1, INTERVALS.length - 1) : 0; s.due = ok ? Date.now() + INTERVALS[s.box] * DAY : Date.now();
-    persist(); CP.track(w, ok, "quiz");
+    const ok = opts[+b.dataset.i] === w;
+    finishQuiz(w, ok, "quiz");
     view.querySelectorAll(".opts button").forEach((x, i) => { x.disabled = true; if (opts[i] === w) x.classList.add("right"); });
     if (!ok) b.classList.add("wrong");
     $("#info").textContent = `Score ${score}/${asked}`;
@@ -119,6 +161,9 @@ function settings() {
   $("#info").textContent = "";
   view.innerHTML = `<div class="opts">
       <label class="setting"><input type="checkbox" id="hp"${cfg.hidePinyin ? " checked" : ""}> <span>Hide pinyin<br><small class="hint">Show Chinese characters only, to test yourself.</small></span></label>
+      <div class="setting" style="display:block"><b>Quiz question types</b>
+        ${Object.entries(QTYPES).map(([k, n]) => `<label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" data-q="${k}" style="width:auto"${cfg.qTypes[k] ? " checked" : ""}> ${n}</label>`).join("")}
+        <small class="hint">Typed answers ignore capitals and tone marks. "Type the characters" needs a Chinese keyboard.</small></div>
       <label>Webhook URL <small class="hint">(optional)</small>
         <input id="wh" type="url" placeholder="https://example.com/hook" value="${esc(cfg.webhook)}">
       </label>
@@ -128,6 +173,7 @@ function settings() {
     </div>`;
   const store = () => { CP.write("settings", cfg); };
   $("#hp").onchange = e => { cfg.hidePinyin = e.target.checked; store(); };
+  view.querySelectorAll("[data-q]").forEach(c => c.onchange = () => { cfg.qTypes[c.dataset.q] = c.checked; store(); });
   $("#wh").onchange = e => { cfg.webhook = e.target.value.trim(); store(); };
   $("#twh").onclick = () => {
     cfg.webhook = $("#wh").value.trim(); store();
