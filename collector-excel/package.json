@@ -1,0 +1,9 @@
+{
+  "name": "chinese-practice-collector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Receives Chinese Practice webhooks, writes them to events.xlsx and serves a dashboard",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "exceljs": "^4.4.0" }
+}
